@@ -1,0 +1,31 @@
+# ROS2 / colcon build çıktıları
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+install/
+log/
+
+# Gazebo log & cache
+.gz/
+*.log
+*.bag
+*.db3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Swarm runtime logları
+.swarm_logs/
+
+# Test cache
+.pytest_cache/

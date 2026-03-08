@@ -1,0 +1,125 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║                          qr_map.yaml                                    ║
+# ║         Şartname Şekil 2 Formatında QR Harita Dosyası                   ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+#
+# Rota:  QR1 → QR4 → QR2 → QR3 → QR5 → QR6 → HOME
+# 0 = SON QR → RETURN_HOME
+#
+# color_zones:
+#   Mavi    (55.0, 50.0):  QR4→QR2 segment ortası  — QR2'de sürüden ayrılma
+#   Kırmızı (77.5, 47.5):  QR3→QR5 segment ortası  — QR5'te sürüden ayrılma
+
+team_id:        team1
+trigger_radius: 5.0
+
+color_zones:
+  - color:  MAVI
+    x:      55.0
+    y:      50.0
+    z:      0.0
+    radius: 3.0
+    note:   "QR4→QR2 segment ortası"
+  - color:  KIRMIZI
+    x:      77.5
+    y:      47.5
+    z:      0.0
+    radius: 3.0
+    note:   "QR3→QR5 segment ortası"
+
+qr_nodes:
+  1:
+    position: {x: 10.0, y: 20.0, z: 0.0}
+    content:
+      qr_id: 1
+      gorev:
+        formasyon:          {aktif: true,  tip: "OKBASI"}
+        manevra_pitch_roll: {aktif: false, pitch_deg: "0",   roll_deg: "0"}
+        irtifa_degisim:     {aktif: true,  deger: 20}
+        bekleme_suresi_s:   3
+      suruden_ayrilma:
+        aktif: false
+        ayrilacak_drone_id: null
+        hedef_renk: null
+        bekleme_suresi_s: null
+      sonraki_qr: {team_1: 4, team_2: 4, team_3: 4}
+
+  2:
+    position: {x: 10.0, y: 50.0, z: 0.0}
+    content:
+      qr_id: 2
+      gorev:
+        formasyon:          {aktif: true,  tip: "CIZGI"}
+        manevra_pitch_roll: {aktif: false, pitch_deg: "0",   roll_deg: "0"}
+        irtifa_degisim:     {aktif: true,  deger: 15}
+        bekleme_suresi_s:   3
+      suruden_ayrilma:
+        aktif: true
+        ayrilacak_drone_id: 2
+        hedef_renk: "MAVI"
+        bekleme_suresi_s: 10
+      sonraki_qr: {team_1: 3, team_2: 3, team_3: 3}
+
+  3:
+    position: {x: 55.0, y: 75.0, z: 0.0}
+    content:
+      qr_id: 3
+      gorev:
+        formasyon:          {aktif: true,  tip: "V"}
+        manevra_pitch_roll: {aktif: false, pitch_deg: "0",   roll_deg: "0"}
+        irtifa_degisim:     {aktif: true,  deger: 25}
+        bekleme_suresi_s:   5
+      suruden_ayrilma:
+        aktif: false
+        ayrilacak_drone_id: null
+        hedef_renk: null
+        bekleme_suresi_s: null
+      sonraki_qr: {team_1: 5, team_2: 5, team_3: 5}
+
+  4:
+    position: {x: 100.0, y: 50.0, z: 0.0}
+    content:
+      qr_id: 4
+      gorev:
+        formasyon:          {aktif: true,  tip: "V"}
+        manevra_pitch_roll: {aktif: true,  pitch_deg: "-15", roll_deg: "0"}
+        irtifa_degisim:     {aktif: false, deger: 0}
+        bekleme_suresi_s:   5
+      suruden_ayrilma:
+        aktif: false
+        ayrilacak_drone_id: null
+        hedef_renk: null
+        bekleme_suresi_s: null
+      sonraki_qr: {team_1: 2, team_2: 2, team_3: 2}
+
+  5:
+    position: {x: 100.0, y: 20.0, z: 0.0}
+    content:
+      qr_id: 5
+      gorev:
+        formasyon:          {aktif: true,  tip: "CIZGI"}
+        manevra_pitch_roll: {aktif: true,  pitch_deg: "0",   roll_deg: "-10"}
+        irtifa_degisim:     {aktif: true,  deger: 10}
+        bekleme_suresi_s:   3
+      suruden_ayrilma:
+        aktif: true
+        ayrilacak_drone_id: 3
+        hedef_renk: "KIRMIZI"
+        bekleme_suresi_s: 10
+      sonraki_qr: {team_1: 6, team_2: 6, team_3: 6}
+
+  6:
+    position: {x: 55.0, y: 5.0, z: 0.0}
+    content:
+      qr_id: 6
+      gorev:
+        formasyon:          {aktif: true,  tip: "OKBASI"}
+        manevra_pitch_roll: {aktif: false, pitch_deg: "0",   roll_deg: "0"}
+        irtifa_degisim:     {aktif: true,  deger: 10}
+        bekleme_suresi_s:   3
+      suruden_ayrilma:
+        aktif: false
+        ayrilacak_drone_id: null
+        hedef_renk: null
+        bekleme_suresi_s: null
+      sonraki_qr: {team_1: 0, team_2: 0, team_3: 0}

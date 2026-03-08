@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  CycloneDDS — Loopback-only konfigürasyonu
+  Ağ bağlantısı olmadan (Wi-Fi kapalı) ROS2 DDS multicast hatalarını giderir.
+  Kullanım: export CYCLONEDDS_URI=file:///path/to/cyclonedds_localhost.xml
+-->
+<CycloneDDS>
+  <Domain>
+    <General>
+      <NetworkInterfaceAddress>lo</NetworkInterfaceAddress>
+      <AllowMulticast>false</AllowMulticast>
+      <EnableMulticastLoopback>true</EnableMulticastLoopback>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>50</MaxAutoParticipantIndex>
+    </Discovery>
+    <Internal>
+      <Watermarks>
+        <WhcHigh>500kB</WhcHigh>
+      </Watermarks>
+    </Internal>
+  </Domain>
+</CycloneDDS>
