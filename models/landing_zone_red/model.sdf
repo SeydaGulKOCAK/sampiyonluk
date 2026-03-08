@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="landing_zone_red">
+    <static>true</static>
+    <link name="link">
+      <visual name="disc">
+        <pose>0 0 0.01 0 0 0</pose>
+        <geometry><cylinder><radius>3.0</radius><length>0.02</length></cylinder></geometry>
+        <material>
+          <ambient>1.0 0.0 0.0 1</ambient>
+          <diffuse>1.0 0.0 0.0 1</diffuse>
+          <emissive>0.0 0.0 0.0 1</emissive>
+          <specular>0.0 0.0 0.0 1</specular>
+        </material>
+        <cast_shadows>false</cast_shadows>
+      </visual>
+      <collision name="c">
+        <pose>0 0 0.01 0 0 0</pose>
+        <geometry><cylinder><radius>3.0</radius><length>0.02</length></cylinder></geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>
