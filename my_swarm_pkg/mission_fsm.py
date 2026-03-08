@@ -62,7 +62,9 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 from std_msgs.msg import String, Header
+from geometry_msgs.msg import Point
 from swarm_msgs.msg import LocalState, SwarmIntent, TaskTrigger, SafetyEvent, QRResult
+from swarm_msgs.srv import SetQRMap
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DURUM SABİTLERİ
@@ -216,6 +218,10 @@ class MissionFSMNode(Node):
         self._heartbeat_pub = self.create_publisher(
             String, '/swarm/gcs_heartbeat', 10
         )
+
+        # ── QR MAP SETUP (JÜRİ KOORDİNATI) ────────────────────────────
+        self._set_qr_map_client = self.create_client(SetQRMap, '/swarm/set_qr_map')
+        self._qr_map_loaded: bool = False
 
         # ── Abonelikler ───────────────────────────────────────────────────────
         # Tüm drone'ların durumları
@@ -498,6 +504,98 @@ class MissionFSMNode(Node):
 
         print('\n'.join(lines), end='', flush=True)
 
+    def setup_qr_map(self, coordinates: list[tuple[float, float, float]] = None) -> None:
+        """
+        JÜRİ KOORDİNATLARINI RUNTIME'DA YÜKLE (Yarışma Günü).
+        
+        Örnek kullanım:
+          qr_coords = [
+              (10.0, 20.0, 15.0),   # QR1 → (x=10, y=20, z=15m)
+              (10.0, 50.0, 15.0),   # QR2
+              (55.0, 75.0, 20.0),   # QR3
+          ]
+          self.setup_qr_map(qr_coords)
+        
+        Eğer coordinates=None ise, CLI'dan input al.
+        """
+        print(f'  {_BOLD}╔══ 🎯 QR HARİTASI AYARLA ══╗{_RESET}')
+        
+        # Koordinatları oku veya kullan
+        if coordinates is None:
+            coordinates = []
+            print(f'  {_BOLD}Jüri tarafından sağlanan QR koordinatlarını girin:{_RESET}')
+            print(f'  Format: x,y,z (örn: 10.0,20.0,15.0)')
+            print(f'  Bitirmek için boş satır girin.')
+            
+            qr_id = 1
+            while True:
+                try:
+                    line = input(f'  QR{qr_id}: ').strip()
+                    if not line:
+                        break
+                    parts = line.split(',')
+                    if len(parts) != 3:
+                        print(f'  {_RED}❌ Format hatalı! x,y,z kullan.{_RESET}')
+                        continue
+                    x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+                    coordinates.append((x, y, z))
+                    qr_id += 1
+                except ValueError:
+                    print(f'  {_RED}❌ Sayı giriniz!{_RESET}')
+                    continue
+        
+        if not coordinates:
+            print(f'  {_YELLOW}⚠️  Koordinat girilmedi, işlem iptal edildi.{_RESET}')
+            return
+        
+        # Service request oluştur
+        request = SetQRMap.Request()
+        
+        # QR ID'lerini sırayla ata (1, 2, 3, ...)
+        qr_ids = list(range(1, len(coordinates) + 1))
+        
+        # Next QR mapping (son QR = 0 = HOME)
+        next_qr_ids = list(range(2, len(coordinates) + 1)) + [0]
+        
+        # Geometry_msgs/Point array
+        for x, y, z in coordinates:
+            pt = Point()
+            pt.x = float(x)
+            pt.y = float(y)
+            pt.z = float(z)
+            request.qr_positions.append(pt)
+        
+        request.qr_ids = qr_ids
+        request.next_qr_ids = next_qr_ids
+        
+        # Service call (async)
+        print(f'  {_BOLD}➡️  SetQRMap service çağrılıyor...{_RESET}')
+        
+        future = self._set_qr_map_client.call_async(request)
+        
+        def response_callback(response_future):
+            try:
+                response = response_future.result()
+                if response.success:
+                    self._qr_map_loaded = True
+                    self.get_logger().info(
+                        f'\n╔══ 🎯 QR HARİTASI BAŞARIYLA YÜKLENDİ ══\n'
+                        f'║  Waypoint sayısı : {len(coordinates)}\n'
+                        f'║  Rota            : ' + ' → '.join(str(q) for q in qr_ids) + f'\n'
+                        f'║  Mesaj           : {response.message}\n'
+                        f'╚{"═"*40}'
+                    )
+                    print(f'  {_GREEN}✅ {response.message}{_RESET}')
+                else:
+                    self.get_logger().warn(f'❌ SetQRMap başarısız: {response.message}')
+                    print(f'  {_RED}❌ Hata: {response.message}{_RESET}')
+            except Exception as e:
+                self.get_logger().error(f'SetQRMap exception: {e}')
+                print(f'  {_RED}❌ Exception: {e}{_RESET}')
+        
+        future.add_done_callback(response_callback)
+
+
     def _print_help(self) -> None:
         print(
             f'\n{_BOLD}╔══════════════════════════════════════╗{_RESET}'
@@ -540,6 +638,8 @@ class MissionFSMNode(Node):
                     self.start_mission()
                 elif cmd in ('a', 'abort'):
                     self.abort_mission()
+                elif cmd in ('m', 'map', 'setup'):
+                    self.setup_qr_map()
                 elif cmd in ('d', 'status'):
                     self._print_dashboard()
                 elif cmd in ('q', 'quit', 'exit'):

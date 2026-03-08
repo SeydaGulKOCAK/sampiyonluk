@@ -67,6 +67,8 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 from geometry_msgs.msg import PoseStamped
 from swarm_msgs.msg import LocalState, QRResult, ColorZone, ColorZoneList
+from std_msgs.msg import Bool
+from swarm_msgs.srv import SetQRMap
 
 try:
     from ament_index_python.packages import get_package_share_directory
@@ -138,6 +140,7 @@ class QRPerception(Node):
 
         # ── PUBLISHER'LAR ────────────────────────────────────────────────
         self._qr_pub   = self.create_publisher(QRResult,      '/qr/result',               10)
+        self._map_ready_pub = self.create_publisher(Bool, '/swarm/qr_map_ready', 10)
         self._zone_pub = self.create_publisher(ColorZoneList, '/perception/color_zones',  10)
 
         # ── ABONELİKLER ─────────────────────────────────────────────────
@@ -148,6 +151,10 @@ class QRPerception(Node):
             self.create_subscription(
                 LocalState, f'/drone{i}/local_state',
                 lambda msg, did=i: self._on_local_state(msg, did), 10)
+
+        # ── RUNTIME QR MAP GÜNCELLEME (JÜRİ KOORDİNATI) ──────────────
+        self.create_service(SetQRMap, '/swarm/set_qr_map', 
+                          self._on_set_qr_map)
 
         # ── TIMER'LAR ────────────────────────────────────────────────────
         self.create_timer(0.1, self._check_qr_proximity)   # 10 Hz
@@ -203,6 +210,109 @@ class QRPerception(Node):
             self.get_logger().error(f'❌ Yükleme hatası: {e}')
 
     # ── CALLBACK'LER ─────────────────────────────────────────────────────
+
+    # ── RUNTIME QR MAP GÜNCELLEME ────────────────────────────────────────
+
+    def _on_set_qr_map(self, request, response):
+        """
+        Jüri tarafından runtime'da QR koordinatlarını yükle (yarışma günü).
+        
+        request.qr_positions: geometry_msgs/Point[] array
+        request.qr_ids:       uint32[] array
+        request.next_qr_ids:  uint32[] array (same length as qr_ids)
+        
+        Builds runtime QR map structure matching YAML format.
+        """
+        try:
+            if len(request.qr_positions) != len(request.qr_ids):
+                response.success = False
+                response.message = (
+                    f"Position/ID count mismatch: {len(request.qr_positions)} vs {len(request.qr_ids)}"
+                )
+                self.get_logger().warn(f'⚠️ SetQRMap: {response.message}')
+                return response
+            
+            if len(request.qr_ids) != len(request.next_qr_ids):
+                response.success = False
+                response.message = (
+                    f"ID/next_qr_id count mismatch: {len(request.qr_ids)} vs {len(request.next_qr_ids)}"
+                )
+                self.get_logger().warn(f'⚠️ SetQRMap: {response.message}')
+                return response
+            
+            # ── Yeni QR haritası oluştur ─────────────────────────────────
+            new_qr_nodes = {}
+            for idx, qr_id in enumerate(request.qr_ids):
+                qr_id_int = int(qr_id)
+                pos = request.qr_positions[idx]
+                next_id = int(request.next_qr_ids[idx])
+                
+                # Team key'leri oluştur (all teams same next QR)
+                sonraki_qr = {
+                    'team_1': next_id,
+                    'team_2': next_id,
+                    'team_3': next_id,
+                }
+                
+                # Şekil 2 uyumlu content yapısı (default)
+                content = {
+                    'qr_id': qr_id_int,
+                    'gorev': {
+                        'formasyon':          {'aktif': True,  'tip': 'OKBASI'},
+                        'manevra_pitch_roll': {'aktif': False, 'pitch_deg': '0', 'roll_deg': '0'},
+                        'irtifa_degisim':     {'aktif': True,  'deger': 20},
+                        'bekleme_suresi_s':   3
+                    },
+                    'suruden_ayrilma': {
+                        'aktif': False,
+                        'ayrilacak_drone_id': None,
+                        'hedef_renk': None,
+                        'bekleme_suresi_s': None
+                    },
+                    'sonraki_qr': sonraki_qr
+                }
+                
+                new_qr_nodes[qr_id_int] = {
+                    'id': qr_id_int,
+                    'position': {
+                        'x': float(pos.x),
+                        'y': float(pos.y),
+                        'z': float(pos.z)
+                    },
+                    'content': content
+                }
+            
+            # ── Eski haritayı değiştir ───────────────────────────────────
+            self._qr_nodes = new_qr_nodes
+            self._read_qr_ids.clear()  # Reset okunan QR'ları
+            
+            response.success = True
+            response.message = (
+                f"✅ {len(new_qr_nodes)} QR waypoint'i runtime yüklendi. Rota: " +
+                ' → '.join(str(k) for k in sorted(new_qr_nodes.keys()))
+            )
+            
+            # ── QR HARİTASI HAZIR TOPIC'İ YAYINLA ───────────────────────
+            ready_msg = Bool()
+            ready_msg.data = True
+            self._map_ready_pub.publish(ready_msg)
+            
+            self.get_logger().info(
+                f'\n╔══ 🎯 JÜRİ QR HARİTASI GÜNCELLENDI ══\n'
+                f'║  Waypoint sayısı : {len(new_qr_nodes)}\n'
+                f'║  Rota            : ' + ' → '.join(str(k) for k in sorted(new_qr_nodes.keys())) + f'\n'
+                f'║  Team ID         : {self._team_id}\n'
+                f'╚{"═"*40}'
+            )
+            
+            return response
+            
+        except Exception as e:
+            response.success = False
+            response.message = f"SetQRMap error: {str(e)}"
+            self.get_logger().error(f'❌ {response.message}')
+            return response
+
 
     def _on_pose(self, msg: PoseStamped, drone_id: int):
         self._drone_poses[drone_id] = msg

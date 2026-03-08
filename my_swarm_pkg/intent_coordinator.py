@@ -72,7 +72,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 
-from std_msgs.msg import UInt8
+from std_msgs.msg import UInt8, Bool
 from geometry_msgs.msg import Point
 
 from swarm_msgs.msg import (
@@ -288,6 +288,11 @@ class IntentCoordinator(Node):
         self.create_subscription(
             TaskTrigger, '/swarm/task_trigger', self._on_task_trigger, 10
         )
+        
+        # 2b) QR haritası hazır sinyali (qr_perception SetQRMap sonrası)
+        self.create_subscription(
+            Bool, '/swarm/qr_map_ready', self._on_qr_map_ready, 10
+        )
 
         # 3) QR kod sonucu (qr_perception → bu topic → intent güncellenir)
         #    Kamera drone'u veya failover drone'u yayınlar.
@@ -405,6 +410,17 @@ class IntentCoordinator(Node):
             if self._mission_phase == MissionPhase.REJOINING:
                 self._mission_phase = MissionPhase.NAVIGATING
 
+    def _on_qr_map_ready(self, msg: Bool):
+        """QR haritası yüklendi sinyali (SetQRMap başarılı olunca)."""
+        if msg.data:
+            self._qr_map_ready = True
+            self.get_logger().info(
+                f'[{self.ns}] ✅ QR HARİTASI HAZIR — TASK1 başlatılabilir'
+            )
+        else:
+            self._qr_map_ready = False
+            self.get_logger().warn(f'[{self.ns}] ⚠️ QR haritası geçersiz kılındı')
+
     def _on_task_trigger(self, msg: TaskTrigger):
         """
         GCS'den gelen görev başlatma / durdurma komutunu işle.
@@ -424,6 +440,18 @@ class IntentCoordinator(Node):
             return
 
         if msg.start:
+            # ── QR HARİTASI KONTROL (JÜRİ KOORDİNATI) ────────────────
+            if not hasattr(self, '_qr_map_ready'):
+                self._qr_map_ready = False
+            
+            if not self._qr_map_ready:
+                self.get_logger().warn(
+                    f'[{self.ns}] ⚠️ QR HARİTASI HENÜZ YÜKLÜ DEĞİL! '
+                    f'task_trigger yoksayıldı. Lütfen jüri koordinatlarını yükle veya '
+                    f'default map ile başla.'
+                )
+                return
+            
             if self._task_active:
                 self.get_logger().warn(
                     f'[{self.ns}] Görev zaten aktif, task_trigger yoksayıldı'
