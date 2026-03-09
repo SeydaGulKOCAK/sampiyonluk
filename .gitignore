@@ -24,6 +24,9 @@ log/
 .DS_Store
 Thumbs.db
 
+# Backup dosyaları
+*.bak
+
 # Swarm runtime logları
 .swarm_logs/
 

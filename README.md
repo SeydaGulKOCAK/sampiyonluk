@@ -372,3 +372,110 @@ gz sim ~/gz_ws/src/my_swarm_pkg/worlds/world_base.sdf -v 4
 
 ---
 
+## 🚁 Hızlı Başlangıç — 3 Drone Aynı Anda Uçurma
+
+Simülasyonda 3 drone'u **aynı anda** kaldırmak için aşağıdaki adımları izleyin.
+
+### Gereksinimler
+
+| Yazılım | Versiyon |
+|---------|---------|
+| Ubuntu | 22.04 LTS |
+| ROS2 | Humble |
+| MAVROS | 2.x (`ros-humble-mavros`) |
+| ArduPilot SITL | ArduCopter V4.7+ |
+| Gazebo | gz-sim (Harmonic veya Garden) |
+| CycloneDDS | `ros-humble-rmw-cyclonedds-cpp` |
+
+### Adım 1 — Sistemi Başlat (Gazebo + SITL + MAVROS)
+
+```bash
+cd ~/sampiyonluk
+bash start_3drone_fixed.sh
+```
+
+Bu script sırasıyla şunları açar:
+1. **Gazebo** — `world_base.sdf` dünyasını `--render-engine ogre` ile başlatır
+2. **3× ArduPilot SITL** — TCP portları: `5760`, `5770`, `5780`
+3. **3× MAVROS** — Her biri bir SITL'e bağlanır (plugin whitelist ile)
+
+> ⏳ Tüm sistemin hazır olması ~30 saniye sürer.
+
+### Adım 2 — Bağlantıyı Doğrula
+
+```bash
+source /opt/ros/humble/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export ROS_LOCALHOST_ONLY=1
+
+# ros2 daemon'u sıfırla (ilk seferde gerekli)
+ros2 daemon stop && ros2 daemon start
+
+# 3 drone'un bağlı olduğunu doğrula
+for d in drone1 drone2 drone3; do
+  echo -n "$d: "
+  ros2 topic echo /$d/state --once 2>/dev/null | grep connected
+done
+# Çıktı: connected: true (3 kez)
+```
+
+### Adım 3 — 3 Drone'u Aynı Anda Kaldır 🚀
+
+```bash
+python3 ~/sampiyonluk/takeoff_3drone.py
+```
+
+Script şu adımları otomatik yapar:
+1. ✅ 3/3 bağlantı kontrolü
+2. ✅ GUIDED mod geçişi (3'ü birden)
+3. 🔥 ARM (3'ü birden)
+4. 🚀 TAKEOFF — CommandTOL ile eşzamanlı kalkış
+5. 📍 Hover — Havada pozisyon takibi (Ctrl+C ile çık)
+
+### Adım 4 — İndirme
+
+```bash
+# 3 drone'u aynı anda indir
+for d in drone1 drone2 drone3; do
+  ros2 service call /$d/set_mode mavros_msgs/srv/SetMode "{custom_mode: 'LAND'}"
+done
+```
+
+### Adım 5 — Sistemi Kapat
+
+```bash
+pkill -9 -f "gz sim"
+pkill -9 -f "arducopter"
+pkill -9 -f "mavros_node"
+```
+
+### ⚠️ Bilinen Sorunlar ve Çözümler
+
+| Sorun | Çözüm |
+|-------|-------|
+| Gazebo ogre2 ile çöküyor | `--render-engine ogre` kullanılıyor (otomatik) |
+| MAVROS "invalid allocator" crash | `config/mavros_plugins.yaml` ile plugin whitelist (otomatik) |
+| `ros2 topic list` boş | `ros2 daemon stop && ros2 daemon start` |
+| MAVROS topic'leri görünmüyor | `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` ayarla |
+| ARM başarısız | Drone'un GUIDED modda olduğundan emin ol |
+
+### 📂 Bu Bölümde Kullanılan Dosyalar
+
+| Dosya | Açıklama |
+|-------|---------|
+| `start_3drone_fixed.sh` | Gazebo + 3 SITL + 3 MAVROS başlatıcı |
+| `takeoff_3drone.py` | 3 drone eşzamanlı ARM + Takeoff scripti |
+| `config/mavros_plugins.yaml` | MAVROS plugin whitelist (crash önleyici) |
+
+### 🔧 MAVROS 2.x Servis Haritası
+
+```
+ARM      → /droneX/mavros/arming    (CommandBool)
+Takeoff  → /droneX/mavros/takeoff   (CommandTOL)
+Set Mode → /droneX/set_mode         (SetMode)
+Command  → /droneX/mavros/command   (CommandLong)
+State    → /droneX/state            (State)
+```
+
+---
+

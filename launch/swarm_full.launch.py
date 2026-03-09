@@ -93,6 +93,9 @@ FENCE = {
 
 def generate_launch_description():
 
+    # ── CycloneDDS: FastDDS shared-memory conflict'ini önler ─────────────
+    os.environ['RMW_IMPLEMENTATION'] = 'rmw_cyclonedds_cpp'
+
     pkg_share = get_package_share_directory('my_swarm_pkg')
 
     # ── Launch argümanları ─────────────────────────────────────────────────
@@ -121,7 +124,11 @@ def generate_launch_description():
         output='screen',
         condition=IfCondition(LaunchConfiguration('with_gz')),
         additional_env={
-            'GZ_SIM_RESOURCE_PATH': os.path.join(pkg_share, 'models'),
+            'GZ_SIM_RESOURCE_PATH': ':'.join([
+                os.path.join(pkg_share, 'models'),
+                os.path.expanduser('~/gz_ws/src/ardupilot_gazebo/models'),
+                os.path.expanduser('~/gz_ws/install/ardupilot_gazebo/share/ardupilot_gazebo/models'),
+            ]),
         },
     )
 
@@ -155,7 +162,7 @@ def generate_launch_description():
     for ns, sysid, port, hx, hy in DRONE_CONFIGS:
         mavros_nodes.append(
             TimerAction(
-                period=8.0 + (sysid - 1) * 0.5,  # SITL hazır olduktan sonra
+                period=25.0 + (sysid - 1) * 2.0,  # SITL hazır olduktan sonra
                 actions=[
                     Node(
                         package='mavros',
@@ -163,7 +170,7 @@ def generate_launch_description():
                         namespace=ns,
                         name='mavros',
                         parameters=[{
-                            'fcu_url':    f'udp://127.0.0.1:{port}@',
+                            'fcu_url':    f'tcp://127.0.0.1:{5760 + (sysid - 1) * 10}',
                             'tgt_system': sysid,
                             'tgt_component': 1,
                             'pluginlists_yaml': os.path.join(
@@ -174,7 +181,8 @@ def generate_launch_description():
                         }],
                         output='log',
                         condition=IfCondition(LaunchConfiguration('with_mavros')),
-                        arguments=['--ros-args', '--log-level',
+                        additional_env={'RMW_IMPLEMENTATION': 'rmw_cyclonedds_cpp'},
+                        arguments=['--log-level',
                                    LaunchConfiguration('log_level')],
                     )
                 ]
@@ -185,12 +193,13 @@ def generate_launch_description():
     per_drone_nodes = []
     for ns, sysid, port, hx, hy in DRONE_CONFIGS:
         env = {
-            'DRONE_NS':    ns,
-            'DRONE_ID':    str(sysid),
-            'SWARM_SIZE':  str(SWARM_SIZE),
-            'HOME_X':      str(hx),
-            'HOME_Y':      str(hy),
-            'HOME_Z':      '0.0',
+            'DRONE_NS':              ns,
+            'DRONE_ID':              str(sysid),
+            'SWARM_SIZE':            str(SWARM_SIZE),
+            'HOME_X':                str(hx),
+            'HOME_Y':                str(hy),
+            'HOME_Z':                '0.0',
+            'RMW_IMPLEMENTATION':    'rmw_cyclonedds_cpp',
             **FENCE,
         }
 
@@ -202,7 +211,8 @@ def generate_launch_description():
                 package='my_swarm_pkg', executable='drone_interface',
                 namespace=ns, name='drone_interface',
                 additional_env=env, output='screen',
-                arguments=['--ros-args', '--log-level',
+                parameters=[{'drone_id': sysid}],
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
@@ -213,7 +223,8 @@ def generate_launch_description():
                 package='my_swarm_pkg', executable='local_fsm',
                 namespace=ns, name='local_fsm',
                 additional_env=env, output='screen',
-                arguments=['--ros-args', '--log-level',
+                parameters=[{'drone_id': sysid}],
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
@@ -224,7 +235,12 @@ def generate_launch_description():
                 package='my_swarm_pkg', executable='intent_coordinator',
                 namespace=ns, name='intent_coordinator',
                 additional_env=env, output='screen',
-                arguments=['--ros-args', '--log-level',
+                parameters=[{
+                    'drone_id':        sysid,
+                    'swarm_size':      SWARM_SIZE,
+                    'camera_drone_id': 1,
+                }],
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
@@ -241,7 +257,7 @@ def generate_launch_description():
                     'formation_type': 'OKBASI',
                     'drone_spacing': 6.0,
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
@@ -256,7 +272,7 @@ def generate_launch_description():
                     'drone_id': sysid,
                     'camera_topic': f'/{ns}/camera/image_raw',
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
@@ -271,7 +287,7 @@ def generate_launch_description():
                     'drone_id':   sysid,
                     'swarm_size': SWARM_SIZE,
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
@@ -285,15 +301,16 @@ def generate_launch_description():
                 parameters=[{
                     'drone_id': sysid,
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]))
 
     # ── ⑤ GCS node'ları (tek örnek) ───────────────────────────────────────
-    gcs_delay = 13.5
+    gcs_delay = 20.0
     gcs_env   = {
-        'SWARM_SIZE': str(SWARM_SIZE),
+        'SWARM_SIZE':         str(SWARM_SIZE),
+        'RMW_IMPLEMENTATION': 'rmw_cyclonedds_cpp',
         **FENCE,
     }
 
@@ -308,7 +325,7 @@ def generate_launch_description():
                     'swarm_size':    SWARM_SIZE,
                     'takeoff_alt_m': 10.0,
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]),
@@ -322,7 +339,7 @@ def generate_launch_description():
                 parameters=[{
                     'swarm_size': SWARM_SIZE,
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]),
@@ -334,9 +351,11 @@ def generate_launch_description():
                 name='mission_fsm',
                 additional_env=gcs_env, output='screen',
                 parameters=[{
-                    'swarm_size': SWARM_SIZE,
+                    'swarm_size':        SWARM_SIZE,
+                    'auto_start':        True,
+                    'auto_start_delay':  10.0,
                 }],
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]),
@@ -356,7 +375,7 @@ def generate_launch_description():
                     'formation_type': 'OKBASI',
                 }],
                 condition=IfCondition(LaunchConfiguration('with_teleop')),
-                arguments=['--ros-args', '--log-level',
+                arguments=['--log-level',
                            LaunchConfiguration('log_level')],
             )
         ]

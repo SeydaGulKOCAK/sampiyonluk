@@ -1,0 +1,19 @@
+# MAVROS Plugin Whitelist — sadece uçuş için gerekli plugin'ler
+/**:
+  ros__parameters:
+    plugin_allowlist:
+      - sys_status
+      - sys_time
+      - command
+      - global_position
+      - local_position
+      - setpoint_position
+      - setpoint_velocity
+      - setpoint_raw
+      - setpoint_attitude
+      - rc_io
+      - imu
+      - altitude
+      - param
+      - waypoint
+      - home_position
