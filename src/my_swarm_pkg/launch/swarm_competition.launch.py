@@ -217,7 +217,7 @@ def generate_launch_description():
                         executable='mavros_node',
                         namespace=ns,
                         parameters=[{
-                            'fcu_url': f'udp://:{port}@',
+                            'fcu_url': f'udp://127.0.0.1:{port}@',
                             'tgt_system': sysid,
                         }],
                         output='log',

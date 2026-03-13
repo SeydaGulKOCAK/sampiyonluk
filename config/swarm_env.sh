@@ -6,23 +6,18 @@
 
 # ── ROS2 workspace ──────────────────────────────────────────
 source /opt/ros/humble/setup.bash
-# source ~/gz_ws/install/setup.bash  # Eğer varsa uncomment et
+source ~/gz_ws/install/setup.bash
 
 # ── DDS: loopback-only (Wi-Fi kapalıyken multicast hatası önleme) ──
 export ROS_LOCALHOST_ONLY=1
-# export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp  # CycloneDDS kurulu değil
-# export CYCLONEDDS_URI="file://$HOME/sampiyonluk/config/cyclonedds_localhost.xml"
+export CYCLONEDDS_URI="file:///home/seyda/gz_ws/src/my_swarm_pkg/config/cyclonedds_localhost.xml"
 
 # ── Gazebo model yolları ─────────────────────────────────────
 export GZ_SIM_RESOURCE_PATH=\
-"$HOME/sampiyonluk/models:"\
-"$HOME/ardupilot_gazebo/models:"\
-"$HOME/ardupilot_gazebo/worlds"
-
-# ── Gazebo plugin yolları (ArduPilotPlugin için) ─────────────
-export GZ_SIM_SYSTEM_PLUGIN_PATH=\
-"$HOME/ardupilot_gazebo/build:"\
-"$GZ_SIM_SYSTEM_PLUGIN_PATH"
+"/home/seyda/gz_ws/install/ardupilot_gazebo/share/ardupilot_gazebo/models:"\
+"/home/seyda/gz_ws/install/ardupilot_gazebo/share/ardupilot_gazebo/worlds:"\
+"/home/seyda/ardupilot_gazebo/models:"\
+"/home/seyda/ardupilot_gazebo/worlds"
 
 # ── ArduPilot SITL ───────────────────────────────────────────
 export PATH="$PATH:$HOME/ardupilot/Tools/autotest"
