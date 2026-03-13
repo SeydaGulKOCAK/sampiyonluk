@@ -124,7 +124,7 @@ if [[ "$WITH_MAVROS" == "true" ]]; then
     ros2 run mavros mavros_node \
       --ros-args \
       -r __ns:=/${NS} \
-      -p fcu_url:="udp://127.0.0.1:${PORT}@" \
+      -p fcu_url:="udp://:${PORT}@" \
       -p tgt_system:=${i} \
       > "$LOG_DIR/mavros_drone${i}.log" 2>&1 &
     sleep 1

@@ -71,7 +71,7 @@ ros2 launch my_swarm_pkg swarm_competition.launch.py
 │            ARDUPILOT SITL (3 instances)                      │
 │         drone1(sysid=1), drone2(2), drone3(3)               │
 └────────────────┬────────────────────────────────────────────┘
-                 │ MAVLink over TCP
+                 │ MAVLink over UDP
 ┌────────────────▼────────────────────────────────────────────┐
 │         MAVROS (3 instances, /drone1 → /drone3)             │
 │    (sensor bridge, setpoint publisher, parameter manager)   │

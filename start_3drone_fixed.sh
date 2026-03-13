@@ -34,7 +34,7 @@ export ROS_LOCALHOST_ONLY=1
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export PATH="$PATH:$HOME/ardupilot/Tools/autotest"
 
-DIR="/home/seyda/sampiyonluk"
+DIR="/home/beyza/sampiyonluk"
 
 export GZ_SIM_RESOURCE_PATH="${DIR}/models:$HOME/gz_ws/install/ardupilot_gazebo/share/ardupilot_gazebo/models:$HOME/gz_ws/install/ardupilot_gazebo/share/ardupilot_gazebo/worlds:$HOME/ardupilot_gazebo/models:$HOME/ardupilot_gazebo/worlds"
 export GZ_SIM_SYSTEM_PLUGIN_PATH="$HOME/gz_ws/install/ardupilot_gazebo/lib/ardupilot_gazebo:$HOME/ardupilot_gazebo/build:$HOME/gz_ws/build/ardupilot_gazebo"
@@ -76,34 +76,38 @@ cd ~/ardupilot
 
 for I in 0 1 2; do
     SYSID=$((I + 1))
-    info "Drone${SYSID}: -I${I}, sysid=${SYSID}"
+    PORT=$((14550 + I * 10))
+    info "Drone${SYSID}: -I${I}, sysid=${SYSID}, udp_out=${PORT}"
     sim_vehicle.py -v ArduCopter --model json \
         -I${I} --sysid ${SYSID} --speedup 1 \
         -l -35.363262,149.165237,584,0 \
+        --out=udp:127.0.0.1:${PORT} \
         --no-rebuild --no-mavproxy \
         > /tmp/sitl_drone${SYSID}.log 2>&1 &
     sleep 3
 done
 
-info "SITL TCP portları bekleniyor..."
+info "SITL süreçleri ve UDP çıkışları hazırlanıyor..."
 for attempt in $(seq 1 30); do
-    OPEN=0
-    for port in 5760 5770 5780; do
-        ss -tlnp 2>/dev/null | grep -q ":${port}" && OPEN=$((OPEN + 1))
+    READY=0
+    for sysid in 1 2 3; do
+        if pgrep -f "sim_vehicle.py -v ArduCopter --model json -I$((sysid - 1)) --sysid ${sysid}" > /dev/null 2>&1; then
+            READY=$((READY + 1))
+        fi
     done
-    printf "\r  ⏳ Portlar: %d/3 açık (%2ds)" "$OPEN" "$attempt"
-    if [ "$OPEN" -eq 3 ]; then
+    printf "\r  ⏳ SITL süreçleri: %d/3 hazır (%2ds)" "$READY" "$attempt"
+    if [ "$READY" -eq 3 ]; then
         break
     fi
     sleep 1
 done
 echo ""
 
-for port in 5760 5770 5780; do
-    if ss -tlnp 2>/dev/null | grep -q ":${port}"; then
-        ok "TCP :${port} AÇIK"
+for port in 14550 14560 14570; do
+    if grep -q "udp:127.0.0.1:${port}" /tmp/sitl_drone*.log 2>/dev/null; then
+        ok "UDP hedefi :${port} AYARLI"
     else
-        err "TCP :${port} KAPALI! Log: /tmp/sitl_drone*.log"
+        warn "UDP hedefi :${port} loglarda doğrulanamadı; süreçler çalışıyorsa devam edilebilir"
     fi
 done
 
@@ -117,13 +121,13 @@ info "Plugin whitelist ile başlatılıyor (crash fix)"
 PLUGIN_YAML="${DIR}/config/mavros_plugins.yaml"
 
 for I in 1 2 3; do
-    PORT=$((5760 + (I - 1) * 10))
-    info "drone${I} MAVROS → tcp://127.0.0.1:${PORT}"
+    PORT=$((14550 + (I - 1) * 10))
+    info "drone${I} MAVROS → udp://:${PORT}@"
 
     ros2 run mavros mavros_node --ros-args \
         -r __ns:=/drone${I} \
         -r __node:=mavros \
-        -p fcu_url:="tcp://127.0.0.1:${PORT}" \
+        -p fcu_url:="udp://:${PORT}@" \
         -p tgt_system:=${I} \
         -p tgt_component:=1 \
         --params-file "${PLUGIN_YAML}" \
@@ -143,7 +147,7 @@ for I in 1 2 3; do
         ros2 run mavros mavros_node --ros-args \
             -r __ns:=/drone${I} \
             -r __node:=mavros \
-            -p fcu_url:="tcp://127.0.0.1:${PORT}" \
+            -p fcu_url:="udp://:${PORT}@" \
             -p tgt_system:=${I} \
             -p tgt_component:=1 \
             -p plugin_denylist:="['companion_process_status','debug_value','obstacle_distance','play_tune','log_transfer','onboard_computer_status','wheel_odometry','vibration']" \
