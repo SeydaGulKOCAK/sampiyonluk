@@ -3,27 +3,10 @@
 import rclpy
 import time
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 
 from mavros_msgs.msg import State
 from mavros_msgs.srv import CommandBool, SetMode, CommandLong
 from geometry_msgs.msg import PoseStamped
-
-# State topic için QoS - MAVROS ile uyumlu
-state_qos = QoSProfile(
-    reliability=ReliabilityPolicy.RELIABLE,
-    durability=DurabilityPolicy.TRANSIENT_LOCAL,
-    history=HistoryPolicy.KEEP_LAST,
-    depth=10
-)
-
-# Sensor/Pose topic için QoS (BEST_EFFORT)
-sensor_qos = QoSProfile(
-    reliability=ReliabilityPolicy.BEST_EFFORT,
-    durability=DurabilityPolicy.VOLATILE,
-    history=HistoryPolicy.KEEP_LAST,
-    depth=10
-)
 
 
 class SwarmTakeoff(Node):
@@ -48,14 +31,14 @@ class SwarmTakeoff(Node):
                 State,
                 f'/{ns}/state',
                 lambda msg, n=ns: self.state_cb(msg, n),
-                state_qos
+                10
             )
 
             self.create_subscription(
                 PoseStamped,
                 f'/{ns}/local_position/pose',
                 lambda msg, n=ns: self.pose_cb(msg, n),
-                sensor_qos
+                10
             )
 
             self.mode_clients[ns] = self.create_client(
@@ -88,19 +71,11 @@ class SwarmTakeoff(Node):
 
     def wait_for_connections(self):
         self.get_logger().info("⏳ Bağlantılar bekleniyor...")
-        attempt = 0
         while rclpy.ok():
-            rclpy.spin_once(self, timeout_sec=0.5)
-            attempt += 1
-            
-            # Her 5 denemede bir durum raporu
-            if attempt % 5 == 0:
-                status = {ns: self.states[ns].connected for ns in self.drones}
-                self.get_logger().info(f"   Bağlantı durumu: {status}")
-            
             if all(self.states[n].connected for n in self.drones):
                 self.get_logger().info("✅ Tüm dronelar bağlı")
                 return
+            rclpy.spin_once(self, timeout_sec=0.5)
 
     def set_guided_all(self):
         self.get_logger().info("🧭 GUIDED moda geçiliyor")
@@ -113,33 +88,12 @@ class SwarmTakeoff(Node):
 
     def arm_all(self):
         self.get_logger().info("🔐 ARM ediliyor")
-        
-        max_retries = 5
-        for attempt in range(max_retries):
-            # ARM komutu gönder
-            for ns in self.drones:
-                if not self.states[ns].armed:
-                    self.arm_clients[ns].wait_for_service()
-                    req = CommandBool.Request()
-                    req.value = True
-                    self.arm_clients[ns].call_async(req)
-            
-            time.sleep(2)
-            
-            # Spin ile state güncellemelerini al
-            for _ in range(10):
-                rclpy.spin_once(self, timeout_sec=0.1)
-            
-            # Kontrol et
-            armed_count = sum(1 for ns in self.drones if self.states[ns].armed)
-            self.get_logger().info(f"   ARM durumu: {armed_count}/{len(self.drones)} drone ARM")
-            
-            if all(self.states[ns].armed for ns in self.drones):
-                self.get_logger().info("✅ Tüm dronelar ARM edildi")
-                return True
-        
-        self.get_logger().warn("⚠️ Bazı dronelar ARM edilemedi")
-        return False
+        for ns in self.drones:
+            self.arm_clients[ns].wait_for_service()
+            req = CommandBool.Request()
+            req.value = True
+            self.arm_clients[ns].call_async(req)
+        time.sleep(3)
 
     def send_takeoff(self, altitude):
         for ns in self.drones:
