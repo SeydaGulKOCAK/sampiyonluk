@@ -170,7 +170,7 @@ def generate_launch_description():
                         namespace=ns,
                         name='mavros',
                         parameters=[{
-                            'fcu_url':    f'tcp://127.0.0.1:{5760 + (sysid - 1) * 10}',
+                            'fcu_url':    f'udp://:{port}@',
                             'tgt_system': sysid,
                             'tgt_component': 1,
                             'pluginlists_yaml': os.path.join(

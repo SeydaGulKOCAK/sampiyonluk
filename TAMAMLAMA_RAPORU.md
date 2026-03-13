@@ -97,7 +97,7 @@ ROS2 Swarm Control Layer
 
 ### **İletişim Protokolü**
 - **SITL ↔ Gazebo:** UDP (14550, 14560, 14570)
-- **SITL ↔ MAVROS:** TCP/MAVLink
+- **SITL ↔ MAVROS:** UDP/MAVLink
 - **MAVROS ↔ Nodes:** ROS2 Topics & Services (loopback DDS)
 - **Jüri Input:** CLI (mission_fsm xterm) → SetQRMap service
 

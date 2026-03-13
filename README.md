@@ -396,8 +396,8 @@ bash start_3drone_fixed.sh
 
 Bu script sırasıyla şunları açar:
 1. **Gazebo** — `world_base.sdf` dünyasını `--render-engine ogre` ile başlatır
-2. **3× ArduPilot SITL** — TCP portları: `5760`, `5770`, `5780`
-3. **3× MAVROS** — Her biri bir SITL'e bağlanır (plugin whitelist ile)
+2. **3× ArduPilot SITL** — UDP çıkış portları: `14550`, `14560`, `14570`
+3. **3× MAVROS** — Her biri ilgili UDP portundan veri alır (plugin whitelist ile)
 
 > ⏳ Tüm sistemin hazır olması ~30 saniye sürer.
 
